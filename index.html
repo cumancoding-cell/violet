@@ -136,6 +136,27 @@
             pointer-events: none;
             z-index: 0;
         }
+        /* Fish and seashell styles */
+        .fish, .seashell {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1;
+            animation-timing-function: linear;
+            will-change: transform;
+        }
+        .fish {
+            width: 70px;
+            height: 36px;
+        }
+        .seashell {
+            width: 40px;
+            height: 40px;
+            animation: rotateShell 5s infinite linear;
+        }
+        @keyframes rotateShell {
+            from { transform: rotate(0deg);}
+            to   { transform: rotate(360deg);}
+        }
     </style>
 </head>
 <body>
@@ -153,7 +174,7 @@
         </nav>
     </header>
     <main>
-        <div class="banner">
+        <div class="banner" id="banner">
             <h5>@ok</h5>
             <div>
                 <h1 class="left">Welcome to My Coding</h1>
@@ -173,6 +194,7 @@
             </h4>
             <button>Subscribe Now &#8599</button>
             <canvas id="dotsCanvas"></canvas>
+            <!-- Fish and shells will be inserted by JS -->
         </div>
     </main>    
     <script>
@@ -266,6 +288,134 @@
         window.addEventListener('resize', () => {
             resizeCanvas();
             createDots(dotCount);
+            fishArr.forEach(f => positionFishOrShell(f.el, true));
+            shellArr.forEach(s => positionFishOrShell(s.el, true));
+        });
+
+        // --- Fishes and seashells ---
+        // Simple SVG fish and seashell
+        function getFishSVG(color) {
+            return `
+            <svg viewBox="0 0 70 36" class="fish" xmlns="http://www.w3.org/2000/svg">
+                <ellipse cx="35" cy="18" rx="28" ry="12" fill="${color}" />
+                <polygon points="63,18 70,8 70,28" fill="${color}" />
+                <ellipse cx="53" cy="14" rx="3" ry="3" fill="#fff"/>
+                <circle cx="54" cy="14" r="1" fill="#222"/>
+                <ellipse cx="17" cy="18" rx="8" ry="8" fill="${color}"/>
+                <polygon points="8,15 0,7 10,19" fill="${color}" />
+            </svg>`;
+        }
+        function getSeashellSVG() {
+            return `
+            <svg viewBox="0 0 40 40" class="seashell" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 8 Q38 25 20 36 Q2 25 20 8" fill="#ffe6be" stroke="#cca36a" stroke-width="2"/>
+                <circle cx="20" cy="32" r="4" fill="#e2c891" />
+            </svg>`;
+        }
+
+        // Spawn fishes and shells in the banner area
+        const colors = ["#6ec6ff","#ff7f92","#ffd480","#7cf2b8","#b89efe"];
+        let fishArr = [];
+        let shellArr = [];
+
+        function random(min, max) { return Math.random() * (max - min) + min; }
+
+        function createFish(n) {
+            for(let i=0; i<n; i++) {
+                let el = document.createElement("div");
+                el.classList.add("fish");
+                el.style.left= "0px";
+                el.style.top= "0px";
+                el.innerHTML = getFishSVG(colors[Math.floor(Math.random()*colors.length)]);
+                banner.appendChild(el);
+                fishArr.push({
+                    el,
+                    speed: random(40,120), // px/sec
+                    y: random(30, banner.offsetHeight-60),
+                    direction: Math.random()<0.5?-1:1,
+                    phase: random(0,Math.PI*2),
+                    waveAmp: random(5,25),
+                    scale: random(0.7,1.1),
+                    delay: random(0,6000)
+                });
+
+                el.style.transform = `scale(${fishArr[fishArr.length-1].scale * (fishArr[fishArr.length-1].direction>0?1:-1)},${fishArr[fishArr.length-1].scale})`; // flip & scale
+            }
+        }
+        function createSeashells(n) {
+            for(let i=0; i<n; i++) {
+                let el = document.createElement("div");
+                el.classList.add("seashell");
+                el.style.left= "0px";
+                el.style.top= "0px";
+                el.innerHTML = getSeashellSVG();
+                banner.appendChild(el);
+                shellArr.push({
+                    el,
+                    y: random(banner.offsetHeight-60, banner.offsetHeight-40),
+                    x: random(5, banner.offsetWidth-45),
+                    scale: random(0.6,1.2)
+                });
+                el.style.transform = `scale(${shellArr[shellArr.length-1].scale})`;
+            }
+        }
+        function positionFishOrShell(el, reset) {
+            // Used to reposition on resize
+            if(el.classList.contains("fish")) {
+                let i = fishArr.findIndex(f=>f.el===el);
+                if(i>=0) {
+                    fishArr[i].y = random(30, banner.offsetHeight-60);
+                    el.style.top = fishArr[i].y + 'px';
+                }
+            } else if(el.classList.contains("seashell")) {
+                let i = shellArr.findIndex(s=>s.el===el);
+                if(i>=0) {
+                    shellArr[i].y = random(banner.offsetHeight-60, banner.offsetHeight-40);
+                    shellArr[i].x = random(5, banner.offsetWidth-45);
+                    el.style.top = shellArr[i].y + "px";
+                    el.style.left = shellArr[i].x + "px";
+                }
+            }
+        }
+
+        // Start with many fish and shells
+        createFish(12);
+        createSeashells(7);
+
+        function moveFish() {
+            let t = Date.now()/1000;
+            fishArr.forEach(f => {
+                // X position: swims horizontally
+                let x = ((t* f.speed + f.delay) % (banner.offsetWidth + 90));
+                if(f.direction<0) x = banner.offsetWidth - x;
+                // Y position: sine wave for swimming
+                let y = f.y + Math.sin(t*2 + f.phase) * f.waveAmp;
+                f.el.style.left = (x-45) + "px";
+                f.el.style.top = y + "px";
+            });
+        }
+        moveFish();
+        function moveShells() {
+            shellArr.forEach(s=>{
+                // Optionally, gently wiggle shells
+                let t = Date.now()/1000;
+                let y = s.y + Math.sin(t*0.8+s.x/30)*1.4;
+                s.el.style.left = s.x + "px";
+                s.el.style.top = y + "px";
+            });
+        }
+        // Animation
+        function bannerAnimLoop() {
+            moveFish();
+            moveShells();
+            requestAnimationFrame(bannerAnimLoop);
+        }
+        bannerAnimLoop();
+
+        // Reposition fish/shells on resize
+        window.addEventListener('resize',()=>{
+            fishArr.forEach(f=>positionFishOrShell(f.el,true));
+            shellArr.forEach(s=>positionFishOrShell(s.el,true));
         });
     </script>
 </body>
